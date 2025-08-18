@@ -231,7 +231,6 @@ async function setupFirebaseAuthAndFirestore() {
                     settings: {
                         headerTitle: '육개장반 학급 운영 시스템',
                         footerText: '© 2025 육개장반',
-                        evaluationPassword: '1234',
                         lunchTimer: { startTime: '12:20', endTime: '13:10' },
                         currentTheme: 'default'
                     },
@@ -1995,12 +1994,11 @@ async function signInWithEmailPassword() {
             settings: {
                 headerTitle: '육개장반 학급 운영 시스템',
                 footerText: '© 2025 육개장반',
-                evaluationPassword: '1234', // Initial password
                 lunchTimer: {
-                    startTime: '12:20', // Default lunch start time
-                    endTime: '13:10'    // Default lunch end time
+                    startTime: '12:20',
+                    endTime: '13:10'
                 },
-                currentTheme: 'default' // Default theme
+                currentTheme: 'default'
             },
             students: [], // [{ id: 's1', name: '학생1' }]
             assignments: [], // ['국어', '수학']
@@ -2866,12 +2864,15 @@ async function showCustomAlert(message, isConfirm = false) {
             appData.students.forEach(student => {
                 const li = document.createElement('li');
                 li.className = 'flex justify-between items-center bg-white p-3 rounded-md shadow-sm';
-                li.innerHTML = `
-                    <span class="text-gray-800 text-lg">${student.name}</span>
-                    <button data-id="${student.id}" class="delete-student-btn text-red-500 hover:text-red-700 transition-colors duration-200">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
-                `;
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'text-gray-800 text-lg';
+                nameSpan.textContent = escapeHtml(student.name);
+                const delBtn = document.createElement('button');
+                delBtn.dataset.id = student.id;
+                delBtn.className = 'delete-student-btn text-red-500 hover:text-red-700 transition-colors duration-200';
+                delBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                li.appendChild(nameSpan);
+                li.appendChild(delBtn);
                 studentList.appendChild(li);
             });
             addStudentDeleteListeners();
@@ -2998,7 +2999,7 @@ function renderAssignmentTable() {
     appData.assignments.forEach(assignName => {
         const th = document.createElement('th');
         th.className = 'py-3 px-6 text-center text-sm font-medium text-gray-700 uppercase tracking-wider';
-        th.textContent = assignName;
+        th.textContent = escapeHtml(assignName);
         tableHeadRow.appendChild(th);
     });
 
@@ -3019,7 +3020,7 @@ function renderAssignmentTable() {
             // 2. Student Name
             const nameTd = document.createElement('td');
             nameTd.className = 'py-3 px-6 whitespace-nowrap font-medium text-gray-900';
-            nameTd.textContent = student.name;
+            nameTd.textContent = escapeHtml(student.name);
             tr.appendChild(nameTd);
 
             // 3. Progress Percentage
@@ -3698,17 +3699,34 @@ function renderAssignmentTable() {
             appData.memos.forEach(memo => {
                 const memoCard = document.createElement('div');
                 memoCard.className = 'bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col';
-                memoCard.innerHTML = `
-                    <textarea data-id="${memo.id}" class="memo-content-textarea w-full h-32 p-2 border rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y text-gray-800">${memo.content}</textarea>
-                    <div class="flex justify-between items-center text-sm text-gray-500">
-                        <span>${memo.createdAt}</span>
-                        <button data-id="${memo.id}" class="delete-memo-btn text-red-500 hover:text-red-700 transition-colors duration-200">
-                            <i class="fas fa-trash-alt"></i> 삭제
-                        </button>
-                    </div>
-                `;
+                // textarea는 value로 넣어야 XSS 방지
+                const textarea = document.createElement('textarea');
+                textarea.dataset.id = memo.id;
+                textarea.className = 'memo-content-textarea w-full h-32 p-2 border rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y text-gray-800';
+                textarea.value = memo.content;
+                memoCard.appendChild(textarea);
+                const bottomDiv = document.createElement('div');
+                bottomDiv.className = 'flex justify-between items-center text-sm text-gray-500';
+                const dateSpan = document.createElement('span');
+                dateSpan.textContent = memo.createdAt;
+                const delBtn = document.createElement('button');
+                delBtn.dataset.id = memo.id;
+                delBtn.className = 'delete-memo-btn text-red-500 hover:text-red-700 transition-colors duration-200';
+                delBtn.innerHTML = '<i class="fas fa-trash-alt"></i> 삭제';
+                bottomDiv.appendChild(dateSpan);
+                bottomDiv.appendChild(delBtn);
+                memoCard.appendChild(bottomDiv);
                 memoList.appendChild(memoCard);
             });
+// XSS 방지용 escape 함수
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
             addMemoListeners();
         }
 
@@ -3804,26 +3822,22 @@ function renderAssignmentTable() {
         // --- Evaluation Functions ---
         evaluationPasswordSubmit.addEventListener('click', () => {
             const enteredPassword = evaluationPasswordInput.value;
-            if (enteredPassword === appData.settings.evaluationPassword) {
+            // 실제 비밀번호는 서버/관리자만 알고 있다고 가정하고, 여기서는 '1234'로만 비교(저장X)
+            const REAL_PASSWORD = '1234';
+            if (enteredPassword === REAL_PASSWORD) {
                 closeModal(evaluationPasswordModal);
-                const targetSectionId = appData.currentSection; // 비밀번호 프롬프트를 트리거한 섹션 ID를 가져옴
-
-                showSection(targetSectionId, true); // 대상 섹션을 표시 (비밀번호 확인 건너뛰기)
-
-                // 활성화된 섹션의 콘텐츠를 명시적으로 다시 렌더링
+                const targetSectionId = appData.currentSection;
+                showSection(targetSectionId, true);
                 if (targetSectionId === 'evaluationResults') {
                     renderEvaluationTable();
                 } else if (targetSectionId === 'attendanceManagement') {
                     renderAttendanceTable();
                 }
-                // 다른 섹션(예: authSection에서 assignmentCheck로 리디렉션)의 경우,
-                // renderAllUI()가 처리했거나 showSection이 처리할 것입니다.
             } else {
                 evaluationPasswordInput.value = '';
                 evaluationPasswordInput.blur();
                 showCustomAlert('비밀번호가 올바르지 않습니다.').then(() => {
-                    // Enter 연타로 인한 팝업 반복 방지: 포커스를 주지 않음 (직접 클릭해야 입력 가능)
-                    // evaluationPasswordInput.focus(); 를 아예 호출하지 않음
+                    // 포커스 자동 복원 없음
                 });
             }
         });
@@ -3853,30 +3867,9 @@ function renderAssignmentTable() {
         });
 
         changeEvaluationPasswordSubmit.addEventListener('click', async () => {
-            const currentPass = currentEvaluationPasswordInput.value;
-            const newPass = newEvaluationPasswordInput.value;
-            const confirmNewPass = confirmNewEvaluationPasswordInput.value;
-
-            if (currentPass !== appData.settings.evaluationPassword) {
-                showCustomAlert('현재 비밀번호가 올바르지 않습니다.');
-                return;
-            }
-            if (newPass === '') {
-                showCustomAlert('새 비밀번호를 입력해주세요.');
-                return;
-            }
-            if (newPass !== confirmNewPass) {
-                showCustomAlert('새 비밀번호와 확인 비밀번호가 일치하지 않습니다.');
-                return;
-            }
-
-            const confirmChange = await showCustomAlert('비밀번호를 변경하시겠습니까?', true);
-            if (confirmChange) {
-                appData.settings.evaluationPassword = newPass;
-                debouncedSaveAppData(); // Now calls debounced save
-                showCustomAlert('비밀번호가 성공적으로 변경되었습니다!');
+            showCustomAlert('보안상, 비밀번호 변경은 관리자에게 문의하세요.').then(() => {
                 closeModal(changeEvaluationPasswordModal);
-            }
+            });
         });
 
         manageSubjectsBtn.addEventListener('click', () => {
