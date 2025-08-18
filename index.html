@@ -25,6 +25,17 @@ function toKey(value) {
 </script>
 <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
+        // XSS 방지용 escape 함수 (전역 window에 할당)
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        window.escapeHtml = escapeHtml;
         import { getAuth, signOut, onAuthStateChanged, signInAnonymously, signInWithCustomToken,
                  createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserLocalPersistence// 이메일/비밀번호 인증을 위한 함수 추가
                } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -2866,7 +2877,7 @@ async function showCustomAlert(message, isConfirm = false) {
                 li.className = 'flex justify-between items-center bg-white p-3 rounded-md shadow-sm';
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'text-gray-800 text-lg';
-                nameSpan.textContent = escapeHtml(student.name);
+                nameSpan.textContent = window.escapeHtml(student.name);
                 const delBtn = document.createElement('button');
                 delBtn.dataset.id = student.id;
                 delBtn.className = 'delete-student-btn text-red-500 hover:text-red-700 transition-colors duration-200';
@@ -2999,7 +3010,7 @@ function renderAssignmentTable() {
     appData.assignments.forEach(assignName => {
         const th = document.createElement('th');
         th.className = 'py-3 px-6 text-center text-sm font-medium text-gray-700 uppercase tracking-wider';
-        th.textContent = escapeHtml(assignName);
+    th.textContent = window.escapeHtml(assignName);
         tableHeadRow.appendChild(th);
     });
 
@@ -3020,7 +3031,7 @@ function renderAssignmentTable() {
             // 2. Student Name
             const nameTd = document.createElement('td');
             nameTd.className = 'py-3 px-6 whitespace-nowrap font-medium text-gray-900';
-            nameTd.textContent = escapeHtml(student.name);
+            nameTd.textContent = window.escapeHtml(student.name);
             tr.appendChild(nameTd);
 
             // 3. Progress Percentage
