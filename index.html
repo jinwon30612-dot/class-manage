@@ -226,9 +226,8 @@ async function setupFirebaseAuthAndFirestore() {
                 document.getElementById('loaded-data-id-display-settings').textContent = `불러온 데이터 ID: ${currentLoadedDataId}`;
                 document.getElementById('loaded-data-id-display-settings').classList.remove('hidden');
 
-                // 데이터 로드 및 UI 초기화
+                // 데이터 로드 및 UI 초기화는 loadDataFromFirestore 내부에서 처리
                 await loadDataFromFirestore(userId);
-                initializeUIAndData();
                 
                 // ✅ 로그인 성공 시 메인 화면으로 이동
                 if (appData.currentSection === 'authSection') {
@@ -448,10 +447,23 @@ async function signInWithEmailPassword() {
                     const cloudData = docSnap.data();
                     // Merge loaded data with default appData to handle new properties gracefully
                     appData = { ...appData, ...cloudData };
+                    // 일정(calendar) 마이그레이션: 각 날짜별 값이 배열이 아니면 배열로 변환 (기존 calendar와 병합)
+                    if (cloudData.calendar && typeof cloudData.calendar === 'object') {
+                        appData.calendar = appData.calendar || {};
+                        for (const key in cloudData.calendar) {
+                            const val = cloudData.calendar[key];
+                            appData.calendar[key] = Array.isArray(val) ? val : [val];
+                        }
+                    }
                     currentLoadedDataId = targetUserId; // Update the loaded data ID display
                     document.getElementById('loaded-data-id-display-settings').textContent = `불러온 데이터 ID: ${currentLoadedDataId}`;
                     console.log("Data loaded from Firestore for user:", targetUserId);
                     saveDataToLocalStorageBackup(); // Update local storage with cloud data
+                    // window.appData와 calendar를 명시적으로 동기화
+                    window.appData = appData;
+                    window.appData.calendar = appData.calendar;
+                    // 데이터 동기화 후 UI 렌더링
+                    if (typeof initializeUIAndData === 'function') initializeUIAndData();
                 } else {
                     console.log("No data found in Firestore for user:", targetUserId);
                     // If no cloud data, check local storage for existing data (migration scenario)
@@ -865,9 +877,16 @@ async function signInWithEmailPassword() {
                 padding: 0.5rem !important;
                 border-radius: 0 !important;
             }
+            nav {
+                overflow-x: auto !important;
+                flex-wrap: nowrap !important;
+                -webkit-overflow-scrolling: touch;
+            }
             .nav-button, .nav-button-themed {
-                padding: 0.5rem 0.7rem !important;
-                font-size: 0.95rem !important;
+                padding: 0.35rem 0.5rem !important;
+                font-size: 0.85rem !important;
+                min-width: 80px;
+                white-space: nowrap;
             }
             .table-container, .evaluation-table-container, .attendance-table-container {
                 max-width: 100vw !important;
@@ -1411,7 +1430,7 @@ async function signInWithEmailPassword() {
         </div>
 
         <!-- Navigation Bar - Adjusted to be right-aligned relative to the title, but still left of the clock -->
-        <nav class="flex-grow flex justify-end space-x-4 mr-4">
+    <nav class="flex-grow flex justify-end space-x-4 mr-4" style="overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;">
             <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="assignmentCheck">과제 점검</button>
             <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="evaluationResults">평가 결과</button>
             <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="attendanceManagement">출결 관리</button>
@@ -2015,7 +2034,7 @@ async function signInWithEmailPassword() {
 
     <script>
         // Global application state
-        let appData = {
+    window.appData = {
             settings: {
                 headerTitle: '육개장반 학급 운영 시스템',
                 footerText: '© 2025 육개장반',
@@ -2491,6 +2510,10 @@ async function signInWithEmailPassword() {
             renderAttendanceTable();
             renderEvaluationTable();
             populateThemeSelection();
+            // 캘린더 렌더링 추가
+            if (typeof renderCalendar === 'function' && typeof viewYear !== 'undefined' && typeof viewMonth !== 'undefined') {
+                renderCalendar(viewYear, viewMonth);
+            }
             // 보호 섹션(evaluationResults, attendanceManagement) 진입 시 인증 요구
             const protectedSections = ['evaluationResults', 'attendanceManagement'];
             if (protectedSections.includes(appData.currentSection)) {
@@ -2644,8 +2667,14 @@ async function showCustomAlert(message, isConfirm = false) {
                     });
                 }
 
+
+                // 캘린더 뷰 기준 연/월을 항상 현재 날짜로 재설정 (데이터 로드 후 보장)
+                const today = new Date();
+                window.viewYear = today.getFullYear();
+                window.viewMonth = today.getMonth(); // 0-based로 맞춤
+
                 // 모든 동적 UI 콘텐츠를 렌더링
-                renderAllUI(); // <-- 이 줄을 추가합니다.
+                renderAllUI();
                 console.log('initializeUIAndData: All UI rendered via renderAllUI.');
 
                 // Show the default section after all initial rendering, with a small delay
@@ -2832,7 +2861,9 @@ async function showCustomAlert(message, isConfirm = false) {
         }
 
         function closeModal(modalElement) {
-            modalElement.style.display = 'none';
+            if (modalElement) {
+                modalElement.style.display = 'none';
+            }
         }
 
         closeButtons.forEach(button => {
@@ -4848,85 +4879,87 @@ function escapeHtml(str) {
   }
 
   function renderCalendar(year, monthZeroBased){
-    viewYear = year; viewMonth = monthZeroBased;
-    const today = new Date();
-    const todayKey = toKey(today.getFullYear(), today.getMonth() + 1, today.getDate());
-    const firstDay = new Date(year, monthZeroBased, 1);
-    const lastDay = new Date(year, monthZeroBased + 1, 0);
-    const startWeek = firstDay.getDay(); // 0(일)~6(토)
-    const totalDays = lastDay.getDate();
+    if (!calendarContainer || !monthLabel) return;
+        viewYear = year; viewMonth = monthZeroBased;
+        const today = new Date();
+        const todayKey = toKey(today.getFullYear(), today.getMonth() + 1, today.getDate());
+        const firstDay = new Date(year, monthZeroBased, 1);
+        const lastDay = new Date(year, monthZeroBased + 1, 0);
+        const startWeek = firstDay.getDay(); // 0(일)~6(토)
+        const totalDays = lastDay.getDate();
 
-    monthLabel.textContent = `${year}년 ${monthZeroBased+1}월`;
+        monthLabel.textContent = `${year}년 ${monthZeroBased+1}월`;
 
-    // 테이블 생성
-    const tbl = document.createElement('table');
-    tbl.className = 'calendar-table';
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-    ['일','월','화','수','목','금','토'].forEach(h=>{
-      const th=document.createElement('th'); th.textContent=h; headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-    tbl.appendChild(thead);
+        // 항상 최신 calendar 참조
+        const calendar = window.appData && window.appData.calendar ? window.appData.calendar : {};
 
-    const tbody = document.createElement('tbody');
+        // 테이블 생성
+        const tbl = document.createElement('table');
+        tbl.className = 'calendar-table';
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        ['일','월','화','수','목','금','토'].forEach(h=>{
+            const th=document.createElement('th'); th.textContent=h; headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        tbl.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
     let row = document.createElement('tr');
 
     // 빈칸
     for(let i=0;i<startWeek;i++){ row.appendChild(document.createElement('td')); }
 
     for(let day=1; day<=totalDays; day++){
-      const dow = new Date(year, monthZeroBased, day).getDay();
-      const td = document.createElement('td');
+        const dow = new Date(year, monthZeroBased, day).getDay();
+        const td = document.createElement('td');
 
-      const dayBox = document.createElement('div');
-      dayBox.className = 'calendar-day';
-      const dateNum = document.createElement('div');
-      dateNum.className = 'date-num';
-      dateNum.textContent = day;
-      dayBox.appendChild(dateNum);
+        const dayBox = document.createElement('div');
+        dayBox.className = 'calendar-day';
+        const dateNum = document.createElement('div');
+        dateNum.className = 'date-num';
+        dateNum.textContent = day;
+        dayBox.appendChild(dateNum);
 
-      const key = toKey(year, monthZeroBased+1, day);
-      if (key === todayKey) {
-    dayBox.classList.add('today');
-}
-      const ev = window.appData.calendar[key];
-// --- (여러 일정 처리) ---
-let events = window.appData.calendar[key];
-// 마이그레이션: 기존에 객체로 저장돼 있던 데이터가 있으면 배열로 바꿔둡니다.
-if (events && !Array.isArray(events)) {
-  events = [events];
-  window.appData.calendar[key] = events;
-}
-events = events || [];
+        const key = toKey(year, monthZeroBased+1, day);
+        if (key === todayKey) {
+            dayBox.classList.add('today');
+        }
+        // 항상 최신 calendar 참조
+        const calendar = window.appData && window.appData.calendar ? window.appData.calendar : {};
+        let events = calendar[key];
+        // 마이그레이션: 기존에 객체로 저장돼 있던 데이터가 있으면 배열로 바꿔둡니다.
+        if (events && !Array.isArray(events)) {
+            events = [events];
+            calendar[key] = events;
+        }
+        events = events || [];
 
-if (events.length > 0) {
-  dayBox.classList.add('has-event');
+        if (events.length > 0) {
+            dayBox.classList.add('has-event');
 
-  const maxToShow = 3; // 한 칸에 보일 최대 일정 개수
-  events.slice(0, maxToShow).forEach(ev => {
-    const titleSpan = document.createElement('div');
-    titleSpan.className = 'small-event';
-    titleSpan.textContent = ev.time ? (ev.time + ' ' + ev.title) : ev.title;
-    if (ev.description) titleSpan.title = ev.description;
-    // ★ 완료 상태 반영
-if (ev.done) {
-  titleSpan.classList.add('done'); // CSS .small-event.done 은 이미 파일에 정의되어 있습니다.
-    titleSpan.textContent = '✔ ' + titleSpan.textContent;
-}
+            const maxToShow = 3; // 한 칸에 보일 최대 일정 개수
+            events.slice(0, maxToShow).forEach(ev => {
+                const titleSpan = document.createElement('div');
+                titleSpan.className = 'small-event';
+                titleSpan.textContent = ev.time ? (ev.time + ' ' + ev.title) : ev.title;
+                if (ev.description) titleSpan.title = ev.description;
+                // ★ 완료 상태 반영
+                if (ev.done) {
+                    titleSpan.classList.add('done'); // CSS .small-event.done 은 이미 파일에 정의되어 있습니다.
+                    titleSpan.textContent = '✔ ' + titleSpan.textContent;
+                }
+                dayBox.appendChild(titleSpan);
+            });
 
-dayBox.appendChild(titleSpan);
-    dayBox.appendChild(titleSpan);
-  });
-
-  if (events.length > maxToShow) {
-    const more = document.createElement('div');
-    more.className = 'small-event';
-    more.style.opacity = '0.85';
-    more.textContent = `+${events.length - maxToShow} 더보기`;
-    dayBox.appendChild(more);
-  }
-}
+            if (events.length > maxToShow) {
+                const more = document.createElement('div');
+                more.className = 'small-event';
+                more.style.opacity = '0.85';
+                more.textContent = `+${events.length - maxToShow} 더보기`;
+                dayBox.appendChild(more);
+            }
+        }
 
 
       dayBox.addEventListener('click', ()=> openEventModalForDate(year, monthZeroBased+1, day));
