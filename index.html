@@ -626,6 +626,55 @@ async function signInWithEmailPassword() {
         document.addEventListener('DOMContentLoaded', setupFirebaseAuthAndFirestore);
     </script>
     <style>
+@media (max-width: 430px) {
+  header {
+    padding: 0.4rem 0.7rem !important;
+  }
+  #header-title-display {
+    font-size: 1.05rem !important;
+  }
+  #header-title-edit {
+    font-size: 0.95rem !important;
+    width: 100px !important;
+    padding: 0.2rem 0.4rem !important;
+  }
+  .flex.items-center.space-x-2 > * {
+    font-size: 0.92rem !important;
+  }
+  #logout-btn {
+    padding: 0.18rem 0.5rem !important;
+    font-size: 0.8rem !important;
+  }
+}
+        /* 모바일 네비게이션 바 가로 스크롤 최적화 */
+#main-navbar {
+  position: relative;
+  z-index: 20;
+    background-color: var(--header-bg, #2563eb); /* 헤더와 동일하게 */
+}
+#main-navbar::-webkit-scrollbar {
+  height: 6px;
+}
+#main-navbar {
+  scrollbar-width: thin;
+  scrollbar-color: #bdbdbd #f5f5f5;
+}
+#main-navbar .nav-button {
+  min-width: 90px;
+  font-size: 1rem;
+  flex: 0 0 auto;
+}
+@media (max-width: 600px) {
+  #main-navbar .nav-button {
+    font-size: 0.95rem;
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+    min-width: 80px;
+  }
+  #main-navbar .flex-nowrap {
+    gap: 0.5rem;
+  }
+}
         :root {
             --header-bg: #2563eb;
             --primary-btn-bg: #3b82f6;
@@ -1420,7 +1469,7 @@ async function signInWithEmailPassword() {
 </div>
 
     <!-- Header -->
-    <header class="text-white p-4 shadow-md flex justify-between items-center rounded-b-xl" style="background-color: var(--header-bg, #2563eb);">
+    <header class="text-white p-4 shadow-md flex justify-between items-center" style="background-color: var(--header-bg, #2563eb);">
         <div class="flex items-center flex-shrink-0">
             <h1 id="header-title-display" class="text-3xl font-bold mr-2 whitespace-nowrap">육개장반 학급 운영 시스템</h1>
             <input type="text" id="header-title-edit" class="header-title-edit p-1 rounded text-gray-800 text-xl" style="width: 200px;">
@@ -1428,19 +1477,6 @@ async function signInWithEmailPassword() {
                 <i class="fas fa-pencil-alt"></i>
             </button>
         </div>
-
-        <!-- Navigation Bar - Adjusted to be right-aligned relative to the title, but still left of the clock -->
-    <nav class="flex-grow flex justify-end space-x-4 mr-4" style="overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;">
-            <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="assignmentCheck">과제 점검</button>
-            <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="evaluationResults">평가 결과</button>
-            <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="attendanceManagement">출결 관리</button>
-            <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="calendar">일정 관리</button>
-            <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="timer">타이머</button>
-            <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="lottery">뽑기</button>
-            <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="noticeBoard">알림장</button>
-            <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="memo">메모</button>
-            <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200" data-section="settings">설정</button>
-        </nav>
 
         <!-- 시간 표시와 로그아웃 버튼을 감싸는 컨테이너 -->
 <div class="flex items-center space-x-2">
@@ -1454,6 +1490,21 @@ async function signInWithEmailPassword() {
     </button>
 </div>
     </header>
+
+    <!-- Navigation Bar (헤더 아래, 가로 스크롤) -->
+<nav id="main-navbar" class="w-full overflow-x-auto shadow-sm border-b border-gray-200 rounded-b-xl" style="background-color: var(--header-bg, #2563eb);">
+  <div class="flex flex-nowrap space-x-2 px-2 py-2 min-w-max" style="-webkit-overflow-scrolling:touch;">
+    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="assignmentCheck">과제 점검</button>
+    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="evaluationResults">평가 결과</button>
+    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="attendanceManagement">출결 관리</button>
+    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="calendar">일정 관리</button>
+    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="timer">타이머</button>
+    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="lottery">뽑기</button>
+    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="noticeBoard">알림장</button>
+    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="memo">메모</button>
+    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="settings">설정</button>
+  </div>
+</nav>
 
     <!-- Main Content Area -->
     <main class="container p-6 bg-white shadow-xl rounded-xl my-6 flex-grow">
