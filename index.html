@@ -2936,7 +2936,8 @@ async function showCustomAlert(message, isConfirm = false) {
             if (e.key === 'Enter' && studentInput.value.trim() !== '') {
                 const newStudentName = studentInput.value.trim();
                 const newStudentId = generateUniqueId();
-                    const keepLoggedIn = document.getElementById('keep-logged-in') ? document.getElementById('keep-logged-in').checked : false;
+                // 학생 정보 추가
+                appData.students.push({ id: newStudentId, name: newStudentName });
                 appData.dailyAssignments[newStudentId] = {}; // Initialize daily assignments for new student
                 appData.assignments.forEach(assignName => {
                     appData.dailyAssignments[newStudentId][assignName] = false; // Default to unchecked
