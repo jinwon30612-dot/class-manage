@@ -1,3 +1,96 @@
+<style>
+/* 방학(여름/겨울) 텍스트만 작게 */
+.holiday-vacation {
+    font-size: 0.85em !important;
+    letter-spacing: -0.5px;
+}
+</style>
+<script>
+// WeatherAPI.com에서 발급받은 API KEY를 아래에 입력하세요.
+const WEATHERAPI_KEY = '1eea93a55a6d4148be1150719252608'; // 예: 'abcd1234...'
+// 해당 날짜가 재량휴업일 또는 방학(여름/겨울)인지 확인
+function isNoClassDay(dateStr) {
+    // dateStr: 'YYYY-MM-DD'
+    const [y, m, d] = dateStr.split('-');
+    // 기존 재량휴업일
+    if (window.appData.noClassDays && window.appData.noClassDays[y + '-' + m]) {
+        if (window.appData.noClassDays[y + '-' + m].includes(d)) return true;
+    }
+    // 방학
+    if (isVacationDay(dateStr)) return true;
+    return false;
+}
+// 방학 기간 내 날짜인지 확인 함수
+function isVacationDay(dateStr) {
+    // dateStr: 'YYYY-MM-DD'
+    if (!window.appData.noClassDays || !window.appData.noClassDays.vacations) return false;
+    const d = new Date(dateStr);
+    for (const v of window.appData.noClassDays.vacations) {
+        if (!v.start || !v.end) continue;
+        const start = new Date(v.start);
+        const end = new Date(v.end);
+        if (d >= start && d <= end) return v.type; // 'summer' or 'winter'
+    }
+    return false;
+}
+</script>
+</script>
+<script>
+// === 실시간 날씨/미세먼지 위젯 ===
+// 1. WeatherAPI.com (https://www.weatherapi.com/)에서 무료 API KEY 발급 필요
+// 2. 에어코리아(https://www.data.go.kr/tcs/dss/selectApiDataDetailView.do?publicDataPk=15073861)에서 인증키 발급 필요
+// 3. 미세먼지 측정소명(예: '중구', '강남구' 등) 지정 필요
+
+
+
+function updateWeatherWidget() {
+        // 위치 자동 감지(브라우저 Geolocation)
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                fetchWeather(lat, lon);
+            }, err => {
+                // 위치 거부 시 기본값(서울)
+                fetchWeather(37.5665, 126.9780);
+            });
+        } else {
+            fetchWeather(37.5665, 126.9780);
+        }
+}
+
+function fetchWeather(lat, lon) {
+    const url = `https://api.weatherapi.com/v1/current.json?key=${WEATHERAPI_KEY}&q=${lat},${lon}&lang=ko`;
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('weather-desc').textContent = data.current.condition.text;
+            document.getElementById('weather-temp').textContent = `${data.current.temp_c}℃`;
+            // 날씨 아이콘
+            document.querySelector('#weather-widget .fa-cloud-sun').className = '';
+            const iconUrl = data.current.condition.icon;
+            const iconImg = document.createElement('img');
+            iconImg.src = iconUrl.startsWith('//') ? 'https:' + iconUrl : iconUrl;
+            iconImg.alt = data.current.condition.text;
+            iconImg.style.width = '24px';
+            iconImg.style.height = '24px';
+            const iconSpan = document.querySelector('#weather-widget span');
+            iconSpan.innerHTML = '';
+            iconSpan.appendChild(iconImg);
+        })
+        .catch(()=>{
+            document.getElementById('weather-desc').textContent = '날씨정보 오류';
+            document.getElementById('weather-temp').textContent = '--℃';
+        });
+}
+
+
+// 최초 1회, 이후 30분마다 갱신
+document.addEventListener('DOMContentLoaded', ()=>{
+    updateWeatherWidget();
+    setInterval(updateWeatherWidget, 1000*60*30);
+});
+</script>
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -20,8 +113,10 @@
     <title>육개장반 학급 운영 시스템</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS for Excel export -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <!-- Inter Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <!-- Google Fonts for Notice Board -->
@@ -59,6 +154,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ddayBtn) ddayBtn.onclick = openDdayModal;
     const closeBtn = document.getElementById('close-dday-modal');
     if (closeBtn) closeBtn.onclick = closeDdayModal;
+        if (typeof loadDdayFromServer === 'function') {
+        loadDdayFromServer();
+    }
 });
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 
@@ -130,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function setDdayEventKey(key) {
             window.appData.ddayEventKey = key;
             if (typeof debouncedSaveAppData === 'function') debouncedSaveAppData();
+            if (typeof saveDdayToServer === 'function') saveDdayToServer({ ddayEventKey: key });
         }
 
         function updateDdayDisplay() {
@@ -198,6 +297,8 @@ async function setupFirebaseAuthAndFirestore() {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     window.auth = auth; // window.auth로 할당하여 글로벌 접근 가능하게
+    // D-DAY 서버 연동용 window.firebase.firestore() 지원 (기존 코드 호환)
+    window.firebase = { firestore: () => getFirestore(app) };
 
         // 🔹 로그인 유지 설정 강화
         await setPersistence(auth, browserLocalPersistence);
@@ -480,6 +581,8 @@ async function signInWithEmailPassword() {
                     window.appData.calendar = appData.calendar;
                     // 데이터 동기화 후 UI 렌더링
                     if (typeof initializeUIAndData === 'function') initializeUIAndData();
+                    // D-DAY 정보도 Firestore에서 항상 동기화
+                    if (typeof loadDdayFromServer === 'function') loadDdayFromServer();
                 } else {
                     console.log("No data found in Firestore for user:", targetUserId);
                     // If no cloud data, check local storage for existing data (migration scenario)
@@ -497,6 +600,8 @@ async function signInWithEmailPassword() {
                             appData = { ...appData, ...parsedLocalData };
                             showCustomAlert('로컬 데이터가 유지됩니다. 클라우드에는 저장되지 않습니다.');
                         }
+                        // D-DAY 정보도 동기화
+                        if (typeof loadDdayFromServer === 'function') loadDdayFromServer();
                     } else {
                         console.log("No local data found either. Using default appData.");
                     }
@@ -659,7 +764,7 @@ async function signInWithEmailPassword() {
 }
 @media (max-width: 430px) {
   header {
-    padding: 0.4rem 0.7rem !important;
+    padding: 0.08rem 0.2rem !important;
   }
   #header-title-display {
     font-size: 1.05rem !important;
@@ -1524,17 +1629,28 @@ async function signInWithEmailPassword() {
 
     <!-- Navigation Bar (헤더 아래, 가로 스크롤) -->
 <nav id="main-navbar" class="w-full overflow-x-auto shadow-sm border-b border-gray-200 rounded-b-xl" style="background-color: var(--header-bg, #2563eb);">
-    <div class="flex flex-nowrap space-x-2 px-2 py-2 min-w-max" style="-webkit-overflow-scrolling:touch;">
-    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="assignmentCheck">과제 점검</button>
-    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="evaluationResults">평가 결과</button>
-    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="attendanceManagement">출결 관리</button>
-    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="calendar">일정 관리</button>
-    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="timer">타이머</button>
-    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="lottery">뽑기</button>
-    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="noticeBoard">알림장</button>
-    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="memo">메모</button>
-    <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="settings">설정</button>
-  </div>
+        <div class="flex flex-nowrap items-center px-2 py-2 min-w-max" style="-webkit-overflow-scrolling:touch; width:100%;">
+            <div class="flex flex-nowrap space-x-2 flex-grow">
+                <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="assignmentCheck">과제 점검</button>
+                <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="evaluationResults">평가 결과</button>
+                <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="attendanceManagement">출결 관리</button>
+                <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="calendar">일정 관리</button>
+                <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="timer">타이머</button>
+                <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="lottery">뽑기</button>
+                <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="noticeBoard">알림장</button>
+                <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="memo">메모</button>
+                <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="settings">설정</button>
+            </div>
+            <div id="weather-widget"
+            class="flex items-center gap-2 text-sm min-w-[180px] h-[40px] px-3 py-1 rounded transition flex-shrink-0 ml-8"
+                style="font-size:0.95em; background-color: var(--header-bg, #2563eb); box-shadow: 0 1px 4px 0 rgba(30,64,175,0.08); border: none; color: #fff; align-items:center;">
+                <span class="animate-pulse text-yellow-200 drop-shadow"><i class="fas fa-cloud-sun"></i></span>
+                <span id="weather-desc" class="text-white font-semibold drop-shadow">날씨</span>
+                <span id="weather-temp" class="text-white font-semibold drop-shadow">--℃</span>
+            </div>
+        </div>
+</nav>
+    </div>
 </nav>
 
     <!-- Main Content Area -->
@@ -1891,15 +2007,18 @@ async function signInWithEmailPassword() {
     <div id="history-modal" class="modal">
         <div class="modal-content w-full md:w-3/4 lg:w-2/3 xl:w-1/2">
             <span class="close-button" data-modal="history-modal">&times;</span>
-            <h3 class="text-2xl font-bold mb-4">과제 수행 이력</h3>
-            <div class="mb-4">
+            <h3 class="text-2xl font-bold mb-4">과제 이력 확인</h3>
+            <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                 <input type="date" id="history-date-picker" class="p-2 border rounded-lg">
+                                <button id="download-history-excel-btn" class="btn-accent text-white px-4 py-2 rounded-lg ml-2">
+                                    <i class="fa-solid fa-file-excel mr-2"></i>엑셀 다운로드
+                                </button>
             </div>
-            <div id="history-content" class="max-h-96 overflow-y-auto border rounded-lg p-4 bg-gray-50">
-                <!-- History content will be loaded here -->
-                <p class="text-gray-600">날짜를 선택하여 이력을 확인하세요.</p>
+            <div id="history-content" class="max-h-96 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                <!-- 이력 내용이 JS로 렌더링됩니다 -->
             </div>
         </div>
+    </div>
     </div>
 
     <!-- Evaluation/Attendance Password Modal (Reused) -->
@@ -2046,16 +2165,33 @@ async function signInWithEmailPassword() {
     <div id="no-class-days-modal" class="modal">
         <div class="modal-content w-full md:w-1/2 lg:w-1/3">
             <span class="close-button" data-modal="no-class-days-modal">&times;</span>
-            <h3 class="text-2xl font-bold mb-4">재량휴업일 설정 (<span id="no-class-month-display"></span>)</h3>
+            <h3 class="text-2xl font-bold mb-4">재량휴업일/방학 설정 (<span id="no-class-month-display"></span>)</h3>
             <div class="mb-4">
                 <input type="date" id="no-class-date-input" class="w-full p-3 border rounded-lg text-lg focus:ring-blue-400 focus:border-blue-400">
                 <button id="add-no-class-day-btn" class="mt-3 btn-primary text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200 w-full">재량휴업일 추가</button>
+            </div>
+            <div class="mb-4 border-t pt-4 mt-4">
+                <div class="flex flex-col gap-2">
+                    <div class="flex gap-2 items-center">
+                        <select id="vacation-type-select" class="p-2 border rounded-lg">
+                            <option value="summer">여름방학</option>
+                            <option value="winter">겨울방학</option>
+                        </select>
+                        <input type="date" id="vacation-start-date" class="p-2 border rounded-lg">
+                        <span>~</span>
+                        <input type="date" id="vacation-end-date" class="p-2 border rounded-lg">
+                        <button id="add-vacation-btn" class="btn-accent text-white px-4 py-2 rounded-lg">방학 추가</button>
+                    </div>
+                </div>
             </div>
             <div class="max-h-60 overflow-y-auto border rounded-lg p-3 bg-gray-50">
                 <ul id="no-class-days-list" class="space-y-2">
                     <!-- No class days will be listed here -->
                 </ul>
-                <p id="no-no-class-days-message" class="text-gray-500 text-center py-2 hidden">등록된 재량휴업일이 없습니다.</p>
+                <ul id="vacation-list" class="space-y-2 mt-4">
+                    <!-- Vacation periods will be listed here -->
+                </ul>
+                <p id="no-no-class-days-message" class="text-gray-500 text-center py-2 hidden">등록된 재량휴업일/방학이 없습니다.</p>
             </div>
         </div>
     </div>
@@ -2195,9 +2331,80 @@ async function signInWithEmailPassword() {
         const assignmentInput = document.getElementById('assignment-input');
         const assignmentList = document.getElementById('assignment-list');
 
-        const historyModal = document.getElementById('history-modal');
-        const historyDatePicker = document.getElementById('history-date-picker');
-        const historyContent = document.getElementById('history-content');
+    const historyModal = document.getElementById('history-modal');
+    const historyDatePicker = document.getElementById('history-date-picker');
+    const historyContent = document.getElementById('history-content');
+    const downloadHistoryExcelBtn = document.getElementById('download-history-excel-btn');
+        // 과제 이력 엑셀 다운로드 기능
+        if (downloadHistoryExcelBtn) {
+            downloadHistoryExcelBtn.addEventListener('click', function() {
+                // 조회한 날짜 가져오기 (historyDatePicker.value 또는 오늘)
+                let selectedDate = '';
+                if (historyDatePicker && historyDatePicker.value) {
+                    selectedDate = historyDatePicker.value;
+                } else {
+                    const today = new Date();
+                    const yyyy = today.getFullYear();
+                    const mm = String(today.getMonth()+1).padStart(2,'0');
+                    const dd = String(today.getDate()).padStart(2,'0');
+                    selectedDate = `${yyyy}-${mm}-${dd}`;
+                }
+                const history = appData.assignmentHistory || {};
+                const entry = history[selectedDate];
+                if (!entry) {
+                    alert('해당 날짜의 과제 이력이 없습니다.');
+                    return;
+                }
+                // 과제명 목록
+                const assignments = entry.assignments || [];
+                // 학생 목록(번호순, 번호 없으면 이름순)
+                let students = (appData.students || []).slice();
+                students.sort((a, b) => {
+                    if (a.number && b.number) return a.number - b.number;
+                    if (a.number) return -1;
+                    if (b.number) return 1;
+                    return a.name.localeCompare(b.name, 'ko');
+                });
+                // 헤더: ['이름', ...과제명]
+                const header = ['이름', ...assignments];
+                const rows = [header];
+                // 학생별 행
+                students.forEach(s => {
+                    const daily = entry.dailyAssignments && entry.dailyAssignments[s.id];
+                    let row = [s.name];
+                    assignments.forEach(a => {
+                        let val = 'X';
+                        if (daily && typeof daily === 'object' && a in daily) {
+                            val = daily[a] ? 'O' : 'X';
+                        }
+                        row.push(val);
+                    });
+                    rows.push(row);
+                });
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                // 모든 셀에 테두리 스타일 적용
+                const range = XLSX.utils.decode_range(ws['!ref']);
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const cell_address = XLSX.utils.encode_cell({r: R, c: C});
+                        if (!ws[cell_address]) continue;
+                        ws[cell_address].s = {
+                            border: {
+                                top: {style: 'thin', color: {rgb: '000000'}},
+                                bottom: {style: 'thin', color: {rgb: '000000'}},
+                                left: {style: 'thin', color: {rgb: '000000'}},
+                                right: {style: 'thin', color: {rgb: '000000'}}
+                            }
+                        };
+                    }
+                }
+                const wb = XLSX.utils.book_new();
+                wb.SheetNames.push('과제이력');
+                wb.Sheets['과제이력'] = ws;
+                // 스타일 적용을 위해 bookType: 'xlsx', cellStyles: true 옵션 사용
+                XLSX.writeFile(wb, `과제이력(${selectedDate}).xlsx`, {bookType: 'xlsx', cellStyles: true});
+            });
+        }
 
         const customAlertModal = document.getElementById('custom-alert-modal');
         const customAlertMessage = document.getElementById('custom-alert-message');
@@ -2314,14 +2521,68 @@ async function signInWithEmailPassword() {
         const studentAttendanceDetailTableBody = document.getElementById('student-attendance-detail-table-body');
         const noDetailMessage = document.getElementById('no-detail-message');
 
-        // No Class Days elements
-        const manageNoClassDaysBtn = document.getElementById('manage-no-class-days-btn');
-        const noClassDaysModal = document.getElementById('no-class-days-modal');
-        const noClassMonthDisplay = document.getElementById('no-class-month-display');
-        const noClassDateInput = document.getElementById('no-class-date-input');
-        const addNoClassDayBtn = document.getElementById('add-no-class-day-btn');
-        const noClassDaysList = document.getElementById('no-class-days-list');
-        const noNoClassDaysMessage = document.getElementById('no-no-class-days-message');
+    // No Class Days & Vacation elements
+    const manageNoClassDaysBtn = document.getElementById('manage-no-class-days-btn');
+    const noClassDaysModal = document.getElementById('no-class-days-modal');
+    const noClassMonthDisplay = document.getElementById('no-class-month-display');
+    const noClassDateInput = document.getElementById('no-class-date-input');
+    const addNoClassDayBtn = document.getElementById('add-no-class-day-btn');
+    const noClassDaysList = document.getElementById('no-class-days-list');
+    const noNoClassDaysMessage = document.getElementById('no-no-class-days-message');
+    // Vacation 관련
+    const vacationTypeSelect = document.getElementById('vacation-type-select');
+    const vacationStartDate = document.getElementById('vacation-start-date');
+    const vacationEndDate = document.getElementById('vacation-end-date');
+    const addVacationBtn = document.getElementById('add-vacation-btn');
+    const vacationList = document.getElementById('vacation-list');
+// 방학 추가 기능
+if (addVacationBtn) {
+    addVacationBtn.onclick = function() {
+        const type = vacationTypeSelect.value;
+        const start = vacationStartDate.value;
+        const end = vacationEndDate.value;
+        if (!start || !end) {
+            showCustomAlert('방학 시작일과 종료일을 모두 입력하세요.');
+            return;
+        }
+        if (end < start) {
+            showCustomAlert('종료일이 시작일보다 빠를 수 없습니다.');
+            return;
+        }
+        if (!window.appData.noClassDays) window.appData.noClassDays = {};
+        if (!window.appData.noClassDays.vacations) window.appData.noClassDays.vacations = [];
+        window.appData.noClassDays.vacations.push({ type, start, end });
+        renderVacationList();
+        if (typeof debouncedSaveAppData === 'function') debouncedSaveAppData();
+    };
+}
+
+function renderVacationList() {
+    if (!vacationList) return;
+    vacationList.innerHTML = '';
+    const vacations = (window.appData.noClassDays && window.appData.noClassDays.vacations) ? window.appData.noClassDays.vacations : [];
+    if (vacations.length === 0) return;
+    vacations.forEach((v, idx) => {
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between bg-blue-50 border border-blue-200 rounded px-3 py-2';
+        li.innerHTML = `<span>${v.type === 'summer' ? '여름방학' : '겨울방학'}: ${v.start} ~ ${v.end}</span><button class="text-red-500 text-xs ml-2" onclick="removeVacation(${idx})">삭제</button>`;
+        vacationList.appendChild(li);
+    });
+}
+
+window.removeVacation = function(idx) {
+    if (!window.appData.noClassDays || !window.appData.noClassDays.vacations) return;
+    window.appData.noClassDays.vacations.splice(idx, 1);
+    renderVacationList();
+    if (typeof debouncedSaveAppData === 'function') debouncedSaveAppData();
+};
+
+// 모달 열릴 때 방학 목록 렌더링
+if (manageNoClassDaysBtn) {
+    manageNoClassDaysBtn.addEventListener('click', function() {
+        setTimeout(renderVacationList, 100);
+    });
+}
 
         // Settings elements
         const openLunchTimerSettingsBtn = document.getElementById('open-lunch-timer-settings-btn');
@@ -2767,6 +3028,8 @@ async function showCustomAlert(message, isConfirm = false) {
                     console.log(`initializeUIAndData: Displaying initial section: ${appData.currentSection}`);
                 }, 50); // Small delay
                 console.log('UI and data initialized successfully.');
+                // D-DAY 표시를 항상 최신 상태로 갱신
+                if (typeof updateDdayDisplay === 'function') updateDdayDisplay();
             } catch (error) {
                 console.error('Error during UI and data initialization:', error);
                 showCustomAlert('앱 UI 및 데이터 초기화 중 오류가 발생했습니다. 개발자 도구 콘솔을 확인해주세요.');
@@ -4373,6 +4636,37 @@ function escapeHtml(str) {
             return appData.noClassDays[monthKey] && appData.noClassDays[monthKey].includes(dayKey);
         }
         
+// 디데이 정보를 서버(Firebase Firestore)에 저장하는 함수
+async function saveDdayToServer(ddayData) {
+    if (!window.firebase || !window.firebase.firestore) return;
+    try {
+        const userId = window.appData && window.appData.userId ? window.appData.userId : 'default';
+        await window.firebase.firestore().collection('dday').doc(userId).set(ddayData);
+    } catch (e) {
+        console.warn('디데이 서버 저장 실패:', e);
+    }
+}
+
+// 서버(Firebase Firestore)에서 디데이 정보를 불러오는 함수
+async function loadDdayFromServer() {
+    if (!window.firebase || !window.firebase.firestore) return null;
+    try {
+        const userId = window.appData && window.appData.userId ? window.appData.userId : 'default';
+        const doc = await window.firebase.firestore().collection('dday').doc(userId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            if (data && data.ddayEventKey) {
+                window.appData.ddayEventKey = data.ddayEventKey;
+                updateDdayDisplay();
+            }
+            return data;
+        }
+    } catch (e) {
+        console.warn('디데이 서버 불러오기 실패:', e);
+    }
+    return null;
+}
+
         // --- 대한민국 공휴일 API 연동 ---
 async function fetchKoreanHolidays(year, month) {
     // month: 1~12
@@ -4472,7 +4766,15 @@ async function applyKoreanHolidaysToNoClassDays(year, month) {
                     const attendanceTd = document.createElement('td');
                     attendanceTd.className = 'py-1 px-1 border';
 
-                    if (isWeekend(year, month, i) || isNoClassDay(year, month, i)) {
+                    const dateStr = `${year}-${String(month).padStart(2,'0')}-${day}`;
+                    const vacType = isVacationDay(dateStr);
+                    if (vacType) {
+                        attendanceTd.classList.add('bg-gray-200', 'text-gray-500', 'font-semibold');
+                        const vacSpan = document.createElement('span');
+                        vacSpan.className = 'holiday-vacation';
+                        vacSpan.textContent = vacType === 'summer' ? '여름방학' : '겨울방학';
+                        attendanceTd.appendChild(vacSpan);
+                    } else if (isWeekend(year, month, i) || isNoClassDay(dateStr)) {
                         attendanceTd.classList.add('bg-gray-200', 'text-gray-500', 'font-semibold');
                         attendanceTd.textContent = '휴무';
                     } else {
@@ -5114,6 +5416,7 @@ async function applyKoreanHolidaysToNoClassDays(year, month) {
     const holidays = await fetchKoreanHolidays(year, monthZeroBased + 1);
 
     for(let day=1; day<=totalDays; day++){
+
         const dow = new Date(year, monthZeroBased, day).getDay();
         const td = document.createElement('td');
 
@@ -5123,7 +5426,7 @@ async function applyKoreanHolidaysToNoClassDays(year, month) {
         dateNum.className = 'date-num';
         dateNum.textContent = day;
         dayBox.appendChild(dateNum);
-                const holidayObj = holidays.find(h => h.day === String(day).padStart(2, '0'));
+        const holidayObj = holidays.find(h => h.day === String(day).padStart(2, '0'));
         if (holidayObj) {
             const holidaySpan = document.createElement('div');
             holidaySpan.className = 'holiday-name';
@@ -5136,22 +5439,36 @@ async function applyKoreanHolidaysToNoClassDays(year, month) {
             dayBox.appendChild(holidaySpan);
         }
 
-        // 공휴일 표시 코드 바로 아래에 추가
-const monthKey = `${year}-${String(monthZeroBased+1).padStart(2, '0')}`;
-const dayKey = String(day).padStart(2, '0');
-const isNoClassDay = window.appData.noClassDays && window.appData.noClassDays[monthKey] && window.appData.noClassDays[monthKey].includes(dayKey);
-const isHoliday = !!holidayObj;
-if (isNoClassDay && !isHoliday) {
-    const discretionarySpan = document.createElement('div');
-    discretionarySpan.className = 'holiday-name';
-    discretionarySpan.textContent = '재량휴업일';
-    discretionarySpan.style.color = 'orange';
-    discretionarySpan.style.fontSize = '1.2em';
-    discretionarySpan.style.marginTop = '4px';
-    discretionarySpan.style.textAlign = 'center';
-    discretionarySpan.style.display = 'block';
-    dayBox.appendChild(discretionarySpan);
-}
+        // 방학/재량휴업일 표시 (방학 우선)
+        const dateStr = `${year}-${String(monthZeroBased+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const vacType = isVacationDay(dateStr);
+        if (vacType) {
+            const vacSpan = document.createElement('div');
+            vacSpan.className = 'holiday-name';
+            vacSpan.textContent = vacType === 'summer' ? '여름방학' : '겨울방학';
+            vacSpan.style.color = '#2563eb';
+            vacSpan.style.fontSize = '1.2em';
+            vacSpan.style.marginTop = '4px';
+            vacSpan.style.textAlign = 'center';
+            vacSpan.style.display = 'block';
+            dayBox.appendChild(vacSpan);
+        } else {
+            const monthKey = `${year}-${String(monthZeroBased+1).padStart(2, '0')}`;
+            const dayKey = String(day).padStart(2, '0');
+            const isNoClass = window.appData.noClassDays && window.appData.noClassDays[monthKey] && window.appData.noClassDays[monthKey].includes(dayKey);
+            const isHoliday = !!holidayObj;
+            if (isNoClass && !isHoliday) {
+                const discretionarySpan = document.createElement('div');
+                discretionarySpan.className = 'holiday-name';
+                discretionarySpan.textContent = '재량휴업일';
+                discretionarySpan.style.color = 'orange';
+                discretionarySpan.style.fontSize = '1.2em';
+                discretionarySpan.style.marginTop = '4px';
+                discretionarySpan.style.textAlign = 'center';
+                discretionarySpan.style.display = 'block';
+                dayBox.appendChild(discretionarySpan);
+            }
+        }
 
         const key = toKey(year, monthZeroBased+1, day);
         if (key === todayKey) {
