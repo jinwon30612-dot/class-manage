@@ -38,6 +38,28 @@ function toKey(value) {
 }
 </script>
 <script type="module">
+// 과제 점검 전체화면 기능
+document.addEventListener('DOMContentLoaded', () => {
+    const fullscreenAssignmentBtn = document.getElementById('fullscreen-assignment-btn');
+    const assignmentSection = document.getElementById('assignmentCheck');
+    if (fullscreenAssignmentBtn && assignmentSection) {
+        fullscreenAssignmentBtn.addEventListener('click', () => {
+            assignmentSection.classList.toggle('fullscreen-active');
+            if (assignmentSection.classList.contains('fullscreen-active')) {
+                fullscreenAssignmentBtn.innerHTML = '<i class="fas fa-compress"></i> 전체화면 해제';
+            } else {
+                fullscreenAssignmentBtn.innerHTML = '<i class="fas fa-expand"></i> 전체화면';
+            }
+        });
+    }
+});
+// D-DAY 관리 모달 버튼 이벤트 연결 (모든 기능 정상 동작 보장)
+document.addEventListener('DOMContentLoaded', () => {
+    const ddayBtn = document.getElementById('manage-dday-btn');
+    if (ddayBtn) ddayBtn.onclick = openDdayModal;
+    const closeBtn = document.getElementById('close-dday-modal');
+    if (closeBtn) closeBtn.onclick = closeDdayModal;
+});
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 
         // XSS 방지용 escape 함수 (전역 window에 할당)
@@ -111,26 +133,26 @@ function toKey(value) {
         }
 
         function updateDdayDisplay() {
-            const ddayDisplay = document.getElementById('dday-display');
-            const ddayKey = getDdayEventKey();
-            if (!ddayKey) { ddayDisplay.style.display = 'none'; return; }
-            const [y, m, d] = ddayKey.split('-').map(Number);
-            const eventDate = new Date(y, m-1, d);
-            const now = new Date();
-            const diff = eventDate - now;
-            const days = Math.ceil(diff / (1000*60*60*24));
-            if (days < 0) { ddayDisplay.style.display = 'none'; return; }
-            // 일정 제목 가져오기
-            let title = '';
-            const calendar = window.appData && window.appData.calendar ? window.appData.calendar : {};
-            const arr = Array.isArray(calendar[ddayKey]) ? calendar[ddayKey] : [calendar[ddayKey]];
-            if (arr && arr[0] && arr[0].title) title = arr[0].title;
-                if (title) {
-                    ddayDisplay.textContent = `${title}까지\n${days === 0 ? '오늘' : days + '일'} 남음`;
-                } else {
-                    ddayDisplay.textContent = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}까지\n${days === 0 ? '오늘' : days + '일'} 남음`;
-                }
-            ddayDisplay.style.display = '';
+    const ddayDisplay = document.getElementById('dday-display');
+    if (!ddayDisplay) return;
+    const ddayKey = getDdayEventKey();
+    if (!ddayKey) { ddayDisplay.style.display = 'none'; return; }
+    const [y, m, d] = ddayKey.split('-').map(Number);
+    const eventDate = new Date(y, m-1, d);
+    const now = new Date();
+    const diff = eventDate - now;
+    const days = Math.ceil(diff / (1000*60*60*24));
+    if (days < 0) { ddayDisplay.style.display = 'none'; return; }
+    let title = '';
+    const calendar = window.appData && window.appData.calendar ? window.appData.calendar : {};
+    const arr = Array.isArray(calendar[ddayKey]) ? calendar[ddayKey] : [calendar[ddayKey]];
+    if (arr && arr[0] && arr[0].title) title = arr[0].title;
+    if (title) {
+        ddayDisplay.textContent = `${title}까지\n${days === 0 ? '오늘' : days + '일'} 남음`;
+    } else {
+        ddayDisplay.textContent = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}까지\n${days === 0 ? '오늘' : days + '일'} 남음`;
+    }
+    ddayDisplay.style.display = '';
         }
 
 
@@ -620,6 +642,21 @@ async function signInWithEmailPassword() {
         document.addEventListener('DOMContentLoaded', setupFirebaseAuthAndFirestore);
     </script>
     <style>
+/* 과제 점검 전체화면 모드 */
+#assignmentCheck.fullscreen-active {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: #fff;
+    box-shadow: none;
+    border-radius: 0;
+    margin: 0;
+    padding: 2vw;
+    overflow: auto;
+}
 @media (max-width: 430px) {
   header {
     padding: 0.4rem 0.7rem !important;
@@ -1544,6 +1581,7 @@ async function signInWithEmailPassword() {
                 <button id="manage-students-btn" class="btn-secondary text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200">학생 명단 관리</button>
                 <button id="manage-assignments-btn" class="btn-accent text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200">과제 관리</button>
                 <button id="view-history-btn" class="btn-info text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200">이력 확인</button>
+                <button id="fullscreen-assignment-btn" class="btn-primary text-white px-4 py-2 rounded-lg transition-colors duration-200"><i class="fas fa-expand"></i> 전체화면</button>
             </div>
 
             <div class="table-container bg-white rounded-xl shadow-md">
@@ -1592,7 +1630,7 @@ async function signInWithEmailPassword() {
                     <button id="next-month-btn" class="btn-primary text-white px-4 py-2 rounded-lg transition-colors duration-200"><i class="fas fa-chevron-right"></i></button>
                 </div>
                 <div class="flex space-x-4">
-                    <button id="manage-no-class-days-btn" class="btn-orange text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200">수업 없는 날 설정</button>
+                    <button id="manage-no-class-days-btn" class="btn-orange text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200">재량휴업일 설정</button>
                     <button id="view-monthly-stats-btn" class="btn-info text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200">월별 통계 보기</button>
                     <button id="batch-attendance-btn" class="btn-teal text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200">일괄 출결 입력</button>
                 </div>
@@ -4291,6 +4329,9 @@ function escapeHtml(str) {
         attendanceMonthPicker.addEventListener('change', async (e) => {
             appData.currentAttendanceMonth = e.target.value;
             debouncedSaveAppData(); // Now calls debounced save
+                // 월 변경 시 공휴일 자동 반영
+    const [year, month] = appData.currentAttendanceMonth.split('-').map(Number);
+    await applyKoreanHolidaysToNoClassDays(year, month);
             renderAttendanceTable();
         });
 
@@ -4300,6 +4341,8 @@ function escapeHtml(str) {
             appData.currentAttendanceMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             attendanceMonthPicker.value = appData.currentAttendanceMonth;
             debouncedSaveAppData(); // Now calls debounced save
+                const [newYear, newMonth] = appData.currentAttendanceMonth.split('-').map(Number);
+    await applyKoreanHolidaysToNoClassDays(newYear, newMonth);
             renderAttendanceTable();
         });
 
@@ -4309,6 +4352,8 @@ function escapeHtml(str) {
             appData.currentAttendanceMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             attendanceMonthPicker.value = appData.currentAttendanceMonth;
             debouncedSaveAppData(); // Now calls debounced save
+                const [newYear, newMonth] = appData.currentAttendanceMonth.split('-').map(Number);
+    await applyKoreanHolidaysToNoClassDays(newYear, newMonth);
             renderAttendanceTable();
         });
 
@@ -4327,7 +4372,57 @@ function escapeHtml(str) {
             const dayKey = String(day).padStart(2, '0');
             return appData.noClassDays[monthKey] && appData.noClassDays[monthKey].includes(dayKey);
         }
+        
+        // --- 대한민국 공휴일 API 연동 ---
+async function fetchKoreanHolidays(year, month) {
+    // month: 1~12
+    const apiKey = '36ef720ca6d6f58aa2eee050f244449acd59f7c50a81e331b4257104d05e3f12';
+    const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getHoliDeInfo?ServiceKey=${apiKey}&solYear=${year}&solMonth=${String(month).padStart(2, '0')}`;
+    try {
+            const response = await fetch(url);
+            const xmlText = await response.text();
+            // XML 파싱
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+            const items = xmlDoc.getElementsByTagName('item');
+            const holidays = [];
+            for (let i = 0; i < items.length; i++) {
+                const isHoliday = items[i].getElementsByTagName('isHoliday')[0]?.textContent;
+                if (isHoliday === 'Y') {
+                    const locdate = items[i].getElementsByTagName('locdate')[0]?.textContent;
+                    const name = items[i].getElementsByTagName('dateName')[0]?.textContent || '공휴일';
+                    // locdate: YYYYMMDD
+                    if (locdate) {
+                        const day = locdate.slice(6, 8); // 'DD'
+                        holidays.push({ day, name });
+                    }
+                }
+            }
+            return holidays; // [{day: '03', name: '개천절'}, ...]
+        } catch (e) {
+            console.warn('공휴일 API 호출 실패:', e);
+            return [];
+    }
+}
 
+async function applyKoreanHolidaysToNoClassDays(year, month) {
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+    const holidays = await fetchKoreanHolidays(year, month);
+    if (!appData.noClassDays[monthKey]) {
+        appData.noClassDays[monthKey] = [];
+    }
+    let changed = false;
+    holidays.forEach(day => {
+        if (!appData.noClassDays[monthKey].includes(day)) {
+            appData.noClassDays[monthKey].push(day);
+            changed = true;
+        }
+    });
+    if (changed) {
+        appData.noClassDays[monthKey].sort();
+        debouncedSaveAppData();
+    }
+}
         function renderAttendanceTable() {
             attendanceTableHeader.innerHTML = '';
             attendanceTableBody.innerHTML = '';
@@ -4982,7 +5077,7 @@ function escapeHtml(str) {
     return `${y}-${pad(m)}-${pad(d)}`;
   }
 
-  function renderCalendar(year, monthZeroBased){
+  async function renderCalendar(year, monthZeroBased){
     if (!calendarContainer || !monthLabel) return;
         viewYear = year; viewMonth = monthZeroBased;
         const today = new Date();
@@ -5014,6 +5109,8 @@ function escapeHtml(str) {
     // 빈칸
     for(let i=0;i<startWeek;i++){ row.appendChild(document.createElement('td')); }
 
+    const holidays = await fetchKoreanHolidays(year, monthZeroBased + 1);
+
     for(let day=1; day<=totalDays; day++){
         const dow = new Date(year, monthZeroBased, day).getDay();
         const td = document.createElement('td');
@@ -5024,6 +5121,32 @@ function escapeHtml(str) {
         dateNum.className = 'date-num';
         dateNum.textContent = day;
         dayBox.appendChild(dateNum);
+                const holidayObj = holidays.find(h => h.day === String(day).padStart(2, '0'));
+        if (holidayObj) {
+            const holidaySpan = document.createElement('div');
+            holidaySpan.className = 'holiday-name';
+            holidaySpan.textContent = holidayObj.name;
+            holidaySpan.style.color = 'red';
+            holidaySpan.style.fontSize = '1.2em';
+            holidaySpan.style.marginTop = '4px';
+            holidaySpan.style.textAlign = 'center';
+            holidaySpan.style.display = 'block';
+            dayBox.appendChild(holidaySpan);
+        }
+
+            const monthKey = `${year}-${String(monthZeroBased + 1).padStart(2, '0')}`;
+    const dayKey = String(day).padStart(2, '0');
+    if (window.appData.noClassDays && window.appData.noClassDays[monthKey] && window.appData.noClassDays[monthKey].includes(dayKey)) {
+        const noClassSpan = document.createElement('div');
+        noClassSpan.className = 'no-class-day-name';
+        noClassSpan.textContent = '재량휴업일';
+        noClassSpan.style.color = 'blue';
+        noClassSpan.style.fontSize = '1.2em';
+        noClassSpan.style.marginTop = '4px';
+        noClassSpan.style.textAlign = 'center';
+        noClassSpan.style.display = 'block';
+        dayBox.appendChild(noClassSpan);
+    }
 
         const key = toKey(year, monthZeroBased+1, day);
         if (key === todayKey) {
@@ -5120,82 +5243,102 @@ function setCalendarEvents(key, events){
     window.appData.calendar[key] = events;
   }
 }
-function renderEventList(){
-  eventListEl.innerHTML = '';
-  const events = getCalendarEvents(activeKey);
-  if (events.length === 0){
-    eventListEl.innerHTML = '<p class="text-gray-500 text-sm">해당 날짜에 일정이 없습니다.</p>';
-    return;
-  }
-  events.forEach(ev => {
-    const item = document.createElement('div');
-    item.className = 'flex items-start justify-between mb-2 p-2 rounded bg-white shadow-sm';
+async function renderEventList(){
+    eventListEl.innerHTML = '';
+    // 현재 activeKey에서 년/월/일 추출
+    const [year, month, day] = activeKey.split('-').map(Number);
 
-    // 체크박스 (To-do)
-    const check = document.createElement('input');
-    check.type = 'checkbox';
-    check.checked = !!ev.done;
-    check.className = 'mr-2 mt-1 checkbox-large';
-    check.style.transformOrigin = 'center';
-    check.style.marginRight = '8px';
-    check.addEventListener('change', () => {
-      ev.done = check.checked;
-      setCalendarEvents(activeKey, events);
-      if (typeof debouncedSaveAppData === 'function') debouncedSaveAppData();
-      renderEventList();
-      renderCalendar(viewYear, viewMonth);
-    });
+    // 공휴일 정보 가져오기 (월 기준)
+    const holidays = await fetchKoreanHolidays(year, month);
 
-    // 왼쪽: 제목/시간/설명
-    const left = document.createElement('div');
-    left.style.flex = '1';
-    left.innerHTML = `<div class="font-semibold">${ev.time ? ev.time + ' ' : ''}${ev.title}</div>
-                      <div class="text-xs text-gray-600">${ev.description ? ev.description : ''}</div>`;
+    // 현재 날짜가 공휴일이면 공휴일 일정 추가
+    let events = getCalendarEvents(activeKey);
+        const holidayObj = holidays.find(h => h.day === String(day).padStart(2, '0'));
+        if (holidayObj && !events.some(ev => ev.isHoliday)) {
+            events.push({
+                id: `holiday-${activeKey}`,
+                title: holidayObj.name,
+                description: '',
+                time: '',
+                done: false,
+                isHoliday: true
+            });
+            setCalendarEvents(activeKey, events);
+        }
 
-    // 완료 표시 스타일
-    if (ev.done) {
-      left.style.textDecoration = 'line-through';
-      left.style.opacity = '0.6';
+    if (events.length === 0){
+        eventListEl.innerHTML = '<p class="text-gray-500 text-sm">해당 날짜에 일정이 없습니다.</p>';
+        return;
     }
+    events.forEach(ev => {
+        const item = document.createElement('div');
+        item.className = 'flex items-start justify-between mb-2 p-2 rounded bg-white shadow-sm';
 
-    // 제목 클릭 시 수정
-    left.addEventListener('click', () => {
-      inputTitle.value = ev.title;
-      inputDesc.value = ev.description || '';
-      inputTime.value = ev.time || '';
-      addBtn.textContent = '수정';
-      addBtn.onclick = () => {
-        ev.title = inputTitle.value.trim();
-        ev.description = inputDesc.value.trim();
-        ev.time = inputTime.value;
-        setCalendarEvents(activeKey, events);
-        if (typeof debouncedSaveAppData === 'function') debouncedSaveAppData();
-        renderEventList();
-        renderCalendar(viewYear, viewMonth);
-        if (typeof updateDdayDisplay === 'function') updateDdayDisplay();
-        // 입력 초기화
-        inputTitle.value = '';
-        inputDesc.value = '';
-        inputTime.value = '';
-        addBtn.textContent = '추가';
-        addBtn.onclick = addCalendarEventFromModal;
-      };
+        // 체크박스 (To-do)
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.checked = !!ev.done;
+        check.className = 'mr-2 mt-1 checkbox-large';
+        check.style.transformOrigin = 'center';
+        check.style.marginRight = '8px';
+        check.addEventListener('change', () => {
+            ev.done = check.checked;
+            setCalendarEvents(activeKey, events);
+            if (typeof debouncedSaveAppData === 'function') debouncedSaveAppData();
+            renderEventList();
+            renderCalendar(viewYear, viewMonth);
+        });
+
+        // 왼쪽: 제목/시간/설명
+        const left = document.createElement('div');
+        left.style.flex = '1';
+        left.innerHTML = `<div class="font-semibold" style="${ev.isHoliday ? 'color:red;' : ''}">${ev.time ? ev.time + ' ' : ''}${ev.title}</div>
+                                            <div class="text-xs text-gray-600">${ev.description ? ev.description : ''}</div>`;
+
+        // 완료 표시 스타일
+        if (ev.done) {
+            left.style.textDecoration = 'line-through';
+            left.style.opacity = '0.6';
+        }
+
+        // 제목 클릭 시 수정
+        left.addEventListener('click', () => {
+            inputTitle.value = ev.title;
+            inputDesc.value = ev.description || '';
+            inputTime.value = ev.time || '';
+            addBtn.textContent = '수정';
+            addBtn.onclick = () => {
+                ev.title = inputTitle.value.trim();
+                ev.description = inputDesc.value.trim();
+                ev.time = inputTime.value;
+                setCalendarEvents(activeKey, events);
+                if (typeof debouncedSaveAppData === 'function') debouncedSaveAppData();
+                renderEventList();
+                renderCalendar(viewYear, viewMonth);
+                if (typeof updateDdayDisplay === 'function') updateDdayDisplay();
+                // 입력 초기화
+                inputTitle.value = '';
+                inputDesc.value = '';
+                inputTime.value = '';
+                addBtn.textContent = '추가';
+                addBtn.onclick = addCalendarEventFromModal;
+            };
+        });
+
+        // 삭제 버튼
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-danger text-white px-2 py-1 rounded ml-2';
+        delBtn.textContent = '삭제';
+        delBtn.addEventListener('click', () => {
+            if (!confirm('이 일정을 삭제하시겠습니까?')) return;
+            deleteCalendarEvent(activeKey, ev.id);
+        });
+
+        item.appendChild(check);
+        item.appendChild(left);
+        item.appendChild(delBtn);
+        eventListEl.appendChild(item);
     });
-
-    // 삭제 버튼
-    const delBtn = document.createElement('button');
-    delBtn.className = 'btn-danger text-white px-2 py-1 rounded ml-2';
-    delBtn.textContent = '삭제';
-    delBtn.addEventListener('click', () => {
-      if (!confirm('이 일정을 삭제하시겠습니까?')) return;
-      deleteCalendarEvent(activeKey, ev.id);
-    });
-
-    item.appendChild(check);
-    item.appendChild(left);
-    item.appendChild(delBtn);
-    eventListEl.appendChild(item);
-  });
 }
 function openEventModalForDate(y, m, d){
   activeKey = toKey(y, m, d);
