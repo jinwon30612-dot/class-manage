@@ -4412,9 +4412,11 @@ async function applyKoreanHolidaysToNoClassDays(year, month) {
         appData.noClassDays[monthKey] = [];
     }
     let changed = false;
-    holidays.forEach(day => {
-        if (!appData.noClassDays[monthKey].includes(day)) {
-            appData.noClassDays[monthKey].push(day);
+    holidays.forEach(holiday => {
+        // holiday.day 값만 추출
+        const dayKey = holiday.day;
+        if (!appData.noClassDays[monthKey].includes(dayKey)) {
+            appData.noClassDays[monthKey].push(dayKey);
             changed = true;
         }
     });
@@ -4742,7 +4744,7 @@ async function applyKoreanHolidaysToNoClassDays(year, month) {
                 debouncedSaveAppData();
                 renderNoClassDaysList();
                 renderAttendanceTable();
-                showCustomAlert(`${dateValue}을(를) 수업 없는 날로 추가했습니다.`);
+                showCustomAlert(`${dateValue}을(를) 재량휴업일으로 추가했습니다.`);
             } else {
                 showCustomAlert('이미 추가된 날짜입니다.');
             }
@@ -4781,7 +4783,7 @@ async function applyKoreanHolidaysToNoClassDays(year, month) {
                 button.onclick = async (e) => {
                     const monthKey = e.currentTarget.dataset.month;
                     const dayKeyToDelete = e.currentTarget.dataset.day;
-                    const confirmDelete = await showCustomAlert(`${monthKey}월 ${dayKeyToDelete}일을 수업 없는 날에서 삭제하시겠습니까?`, true);
+                    const confirmDelete = await showCustomAlert(`${monthKey}월 ${dayKeyToDelete}일을 재량휴업일에서 삭제하시겠습니까?`, true);
                     if (confirmDelete) {
                         if (appData.noClassDays[monthKey]) {
                             appData.noClassDays[monthKey] = appData.noClassDays[monthKey].filter(d => d !== dayKeyToDelete);
@@ -5134,19 +5136,22 @@ async function applyKoreanHolidaysToNoClassDays(year, month) {
             dayBox.appendChild(holidaySpan);
         }
 
-            const monthKey = `${year}-${String(monthZeroBased + 1).padStart(2, '0')}`;
-    const dayKey = String(day).padStart(2, '0');
-    if (window.appData.noClassDays && window.appData.noClassDays[monthKey] && window.appData.noClassDays[monthKey].includes(dayKey)) {
-        const noClassSpan = document.createElement('div');
-        noClassSpan.className = 'no-class-day-name';
-        noClassSpan.textContent = '재량휴업일';
-        noClassSpan.style.color = 'blue';
-        noClassSpan.style.fontSize = '1.2em';
-        noClassSpan.style.marginTop = '4px';
-        noClassSpan.style.textAlign = 'center';
-        noClassSpan.style.display = 'block';
-        dayBox.appendChild(noClassSpan);
-    }
+        // 공휴일 표시 코드 바로 아래에 추가
+const monthKey = `${year}-${String(monthZeroBased+1).padStart(2, '0')}`;
+const dayKey = String(day).padStart(2, '0');
+const isNoClassDay = window.appData.noClassDays && window.appData.noClassDays[monthKey] && window.appData.noClassDays[monthKey].includes(dayKey);
+const isHoliday = !!holidayObj;
+if (isNoClassDay && !isHoliday) {
+    const discretionarySpan = document.createElement('div');
+    discretionarySpan.className = 'holiday-name';
+    discretionarySpan.textContent = '재량휴업일';
+    discretionarySpan.style.color = 'orange';
+    discretionarySpan.style.fontSize = '1.2em';
+    discretionarySpan.style.marginTop = '4px';
+    discretionarySpan.style.textAlign = 'center';
+    discretionarySpan.style.display = 'block';
+    dayBox.appendChild(discretionarySpan);
+}
 
         const key = toKey(year, monthZeroBased+1, day);
         if (key === todayKey) {
