@@ -165,14 +165,7 @@ function toKey(value) {
         }
 
         // D-Day 관리 버튼 이벤트 연결
-        document.addEventListener('DOMContentLoaded', () => {
-            const ddayBtn = document.getElementById('manage-dday-btn');
-            if (ddayBtn) ddayBtn.onclick = openDdayModal;
-            const closeBtn = document.getElementById('close-dday-modal');
-            if (closeBtn) closeBtn.onclick = closeDdayModal;
-            // D-Day 표시 갱신 (페이지 진입/일정 변경 시)
-            updateDdayDisplay();
-        });
+    // 자리배치 관련 코드 전체 삭제됨
 
         // 일정 추가/수정/삭제 시 D-Day 표시 갱신
         window.updateDdayDisplay = updateDdayDisplay;
@@ -180,8 +173,9 @@ function toKey(value) {
         // Initialize Firebase and set up authentication listener
 async function setupFirebaseAuthAndFirestore() {
     try {
-        app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    window.auth = auth; // window.auth로 할당하여 글로벌 접근 가능하게
 
         // 🔹 로그인 유지 설정 강화
         await setPersistence(auth, browserLocalPersistence);
@@ -413,7 +407,7 @@ async function signInWithEmailPassword() {
             }, 500); // Save after 500ms of inactivity
         }
 
-        // Save data to Firestore (always saves to the currently authenticated userId)
+        // Save data to Firestore (always saves to the current<ly au>thenticated userId)
         async function saveDataToFirestore() {
             if (!userId) {
                 console.warn("No authenticated user ID available to save data to Firestore. Data will only be saved locally.");
@@ -1493,7 +1487,7 @@ async function signInWithEmailPassword() {
 
     <!-- Navigation Bar (헤더 아래, 가로 스크롤) -->
 <nav id="main-navbar" class="w-full overflow-x-auto shadow-sm border-b border-gray-200 rounded-b-xl" style="background-color: var(--header-bg, #2563eb);">
-  <div class="flex flex-nowrap space-x-2 px-2 py-2 min-w-max" style="-webkit-overflow-scrolling:touch;">
+    <div class="flex flex-nowrap space-x-2 px-2 py-2 min-w-max" style="-webkit-overflow-scrolling:touch;">
     <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="assignmentCheck">과제 점검</button>
     <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="evaluationResults">평가 결과</button>
     <button class="nav-button nav-button-themed px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap" data-section="attendanceManagement">출결 관리</button>
@@ -1526,6 +1520,7 @@ async function signInWithEmailPassword() {
                     <h3 class="text-xl font-semibold text-gray-700 text-center">이메일/비밀번호 로그인</h3>
                     <input type="email" id="email-input" placeholder="이메일" class="p-2 border rounded-lg text-lg">
                     <input type="password" id="password-input" placeholder="비밀번호" class="p-2 border rounded-lg text-lg">
+                <button id="forgot-password-btn" class="text-blue-500 underline text-sm ml-2">비밀번호를 잊으셨나요?</button>
                     <div class="flex items-center mb-2">
                         <input type="checkbox" id="keep-logged-in" class="mr-2 checkbox-large">
                         <label for="keep-logged-in" class="text-sm select-none">로그인 유지</label>
@@ -2830,9 +2825,9 @@ async function showCustomAlert(message, isConfirm = false) {
             if ((sectionId === 'evaluationResults' || sectionId === 'attendanceManagement') && !skipPasswordCheck) {
                 passwordModalTitle.textContent = (sectionId === 'evaluationResults' ? '평가 결과' : '출결 관리') + ' 비밀번호 입력';
                 openModal(evaluationPasswordModal);
-                evaluationPasswordInput.value = ''; // Clear previous input
+                evaluationPasswordInput.value = '';
                 evaluationPasswordInput.focus();
-                return; // Prevent direct section display until password is confirmed
+                return;
             }
 
             sections.forEach(section => {
@@ -2875,14 +2870,13 @@ async function showCustomAlert(message, isConfirm = false) {
                     showManualTimerContainer();
                 }
             } else if (sectionId === 'lottery') {
-                // Reset lottery picked lists when switching to lottery section
+                // 탭 이동 시 pickedStudents를 초기화하지 않음. 기존 값 유지
                 if (!appData.lottery) {
                     appData.lottery = { studentHistory: [], numberHistory: [], pickedStudents: [], pickedNumbers: [] };
                 }
-                appData.lottery.pickedStudents = []; // Reset picked students for new session
-                studentLotteryResultDisplay.innerHTML = `<span id="current-lottery-result" class="text-2xl text-gray-600"></span>`;
-                // Default to student lottery
+                // studentLotteryResultDisplay.innerHTML = `<span id="current-lottery-result" class="text-2xl text-gray-600"></span>`;
                 showStudentLotteryContainer();
+                renderLotteryHistory(); // 이미 뽑힌 학생 결과를 항상 반영
             } else if (sectionId === 'noticeBoard') {
                 updateNoticeBoard();
             } else if (sectionId === 'memo') {
@@ -3509,9 +3503,9 @@ function renderAssignmentTable() {
             if (!appData.lottery) {
                 appData.lottery = { studentHistory: [], numberHistory: [], pickedStudents: [], pickedNumbers: [] };
             }
-            appData.lottery.pickedStudents = [];
-            studentLotteryResultDisplay.innerHTML = `<span id="current-lottery-result" class="text-2xl text-gray-600"></span>`;
+            // 탭 이동 시 pickedStudents를 초기화하지 않음. 기존 값 유지
             showStudentLotteryContainer();
+            renderLotteryHistory(); // 이미 뽑힌 학생 결과를 항상 반영
         });
 
         showNumberLotteryBtn.addEventListener('click', () => {
@@ -3930,8 +3924,8 @@ function escapeHtml(str) {
         // --- Evaluation Functions ---
         evaluationPasswordSubmit.addEventListener('click', () => {
             const enteredPassword = evaluationPasswordInput.value;
-            // 실제 비밀번호는 서버/관리자만 알고 있다고 가정하고, 여기서는 '1234'로만 비교(저장X)
-            const REAL_PASSWORD = '1234';
+            // 실제 비밀번호는 appData.settings.evaluationPassword에 저장
+            const REAL_PASSWORD = (appData.settings && appData.settings.evaluationPassword) ? appData.settings.evaluationPassword : '1234';
             if (enteredPassword === REAL_PASSWORD) {
                 closeModal(evaluationPasswordModal);
                 const targetSectionId = appData.currentSection;
@@ -3972,12 +3966,71 @@ function escapeHtml(str) {
             newEvaluationPasswordInput.value = '';
             confirmNewEvaluationPasswordInput.value = '';
             currentEvaluationPasswordInput.focus();
+            // 인증코드 대신 특정 문구 입력 방식으로 변경
+            if (!document.getElementById('reset-evaluation-password-btn')) {
+                const resetBtn = document.createElement('button');
+                resetBtn.id = 'reset-evaluation-password-btn';
+                resetBtn.className = 'btn-danger text-white px-6 py-3 rounded-lg shadow-md transition-colors duration-200 mt-4';
+                resetBtn.textContent = '비밀번호 1234로 초기화 (인증 필요)';
+                resetBtn.onclick = async function() {
+                    const phrase = prompt("비밀번호 초기화를 위해 인증 문구를 입력하세요.");
+                    if (phrase === 'boan-25') {
+                        if (!appData.settings) appData.settings = {};
+                        appData.settings.evaluationPassword = '1234';
+                        debouncedSaveAppData();
+                        showCustomAlert('비밀번호가 1234로 초기화되었습니다.');
+                        closeModal(changeEvaluationPasswordModal);
+                    } else {
+                        showCustomAlert('문구가 올바르지 않습니다.');
+                    }
+                };
+                changeEvaluationPasswordModal.querySelector('.modal-content').appendChild(resetBtn);
+            }
+        // 비밀번호 재설정(이메일 발송) 기능
+        const forgotPwBtn = document.getElementById('forgot-password-btn');
+        if (forgotPwBtn) {
+            forgotPwBtn.addEventListener('click', async () => {
+                const emailInput = document.getElementById('email-input');
+                const email = emailInput ? emailInput.value.trim() : '';
+                if (!email) {
+                    showCustomAlert('비밀번호 재설정 메일을 받을 이메일을 입력하세요.');
+                    return;
+                }
+                try {
+                    const { getAuth, sendPasswordResetEmail } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
+                    await sendPasswordResetEmail(getAuth(), email);
+                    showCustomAlert('비밀번호 재설정 메일이 발송되었습니다. 메일함을 확인하세요.');
+                } catch (e) {
+                    showCustomAlert('비밀번호 재설정 메일 발송에 실패했습니다. 가입된 이메일인지 확인하세요.');
+                }
+            });
+        }
         });
 
         changeEvaluationPasswordSubmit.addEventListener('click', async () => {
-            showCustomAlert('보안상, 비밀번호 변경은 관리자에게 문의하세요.').then(() => {
+            const currentPw = currentEvaluationPasswordInput.value.trim();
+            const newPw = newEvaluationPasswordInput.value.trim();
+            const confirmPw = confirmNewEvaluationPasswordInput.value.trim();
+            if (!newPw || newPw.length < 4) {
+                showCustomAlert('새 비밀번호는 4자 이상이어야 합니다.');
+                return;
+            }
+            if (newPw !== confirmPw) {
+                showCustomAlert('새 비밀번호가 일치하지 않습니다.');
+                return;
+            }
+            if (!appData.settings) appData.settings = {};
+            if (!appData.settings.evaluationPassword || appData.settings.evaluationPassword === currentPw) {
+                appData.settings.evaluationPassword = newPw;
+                debouncedSaveAppData();
+                showCustomAlert('비밀번호가 성공적으로 변경되었습니다.');
                 closeModal(changeEvaluationPasswordModal);
-            });
+                currentEvaluationPasswordInput.value = '';
+                newEvaluationPasswordInput.value = '';
+                confirmNewEvaluationPasswordInput.value = '';
+            } else {
+                showCustomAlert('현재 비밀번호가 올바르지 않습니다.');
+            }
         });
 
         manageSubjectsBtn.addEventListener('click', () => {
