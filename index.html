@@ -1873,9 +1873,12 @@ async function signInWithEmailPassword() {
             <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b-2 pb-2">알림장</h2>
             <div class="bg-gray-200 p-6 rounded-xl shadow-md">
                 <div class="flex justify-between items-center mb-4">
-                    <button id="fullscreen-notice-btn" class="btn-primary text-white px-4 py-2 rounded-lg transition-colors duration-200">
-                    <i class="fas fa-expand"></i> 전체화면
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button id="fullscreen-notice-btn" class="btn-primary text-white px-4 py-2 rounded-lg transition-colors duration-200">
+                        <i class="fas fa-expand"></i> 전체화면
+                        </button>
+                        <button id="view-notice-history-btn" class="btn-info text-white px-4 py-2 rounded-lg transition-colors duration-200">알림장 이력 확인</button>
+                    </div>
                     <p id="notice-date" class="text-xl font-semibold text-gray-700"></p>
                     <div class="flex space-x-2">
                         <select id="notice-font-family" class="p-2 border rounded-lg">
@@ -1890,6 +1893,19 @@ async function signInWithEmailPassword() {
                     </div>
                 </div>
                 <textarea id="notice-content" class="w-full p-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 text-white" placeholder="알림장 내용을 작성해주세요." rows="5"></textarea>
+            </div>
+            <!-- 알림장 이력 모달 -->
+            <div id="notice-history-modal" class="modal">
+                <div class="modal-content w-full max-w-md">
+                    <span class="close-button" data-modal="notice-history-modal">&times;</span>
+                    <h3 class="text-2xl font-bold mb-4">알림장 이력 확인</h3>
+                    <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                        <input type="date" id="notice-history-date-picker" class="p-2 border rounded-lg">
+                    </div>
+                    <div id="notice-history-content" class="max-h-96 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                        <!-- 이력 내용이 JS로 렌더링됩니다 -->
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -2451,12 +2467,17 @@ async function signInWithEmailPassword() {
         const numberLotteryHistoryList = document.getElementById('number-lottery-history-list');
 
         // Notice Board elements
-        const noticeDate = document.getElementById('notice-date');
-        const noticeFontFamily = document.getElementById('notice-font-family');
-        const noticeFontSize = document.getElementById('notice-font-size');
-        const noticeContent = document.getElementById('notice-content');
-        const loadPrevNoticeBtn = document.getElementById('load-prev-notice-btn');
-        const copyNoticeBtn = document.getElementById('copy-notice-btn');
+    const noticeDate = document.getElementById('notice-date');
+    const noticeFontFamily = document.getElementById('notice-font-family');
+    const noticeFontSize = document.getElementById('notice-font-size');
+    const noticeContent = document.getElementById('notice-content');
+    const loadPrevNoticeBtn = document.getElementById('load-prev-notice-btn');
+    const copyNoticeBtn = document.getElementById('copy-notice-btn');
+    // 알림장 이력 관련 요소
+    const viewNoticeHistoryBtn = document.getElementById('view-notice-history-btn');
+    const noticeHistoryModal = document.getElementById('notice-history-modal');
+    const noticeHistoryDatePicker = document.getElementById('notice-history-date-picker');
+    const noticeHistoryContent = document.getElementById('notice-history-content');
 
         // Memo elements
         const addMemoBtn = document.getElementById('add-memo-btn');
@@ -4026,6 +4047,12 @@ function renderAssignmentTable() {
             noticeFontSize.value = appData.notice.fontSize;
 
             autoExpandTextarea(noticeContent);
+            // 알림장 이력 날짜 선택기 기본값 오늘로 설정
+            if (noticeHistoryDatePicker) {
+                const todayStr = getFormattedDate();
+                noticeHistoryDatePicker.value = todayStr;
+                noticeHistoryDatePicker.max = todayStr;
+            }
         }
 
         noticeFontFamily.addEventListener('change', async (e) => {
@@ -4079,6 +4106,50 @@ function renderAssignmentTable() {
             document.execCommand('copy');
             showCustomAlert('알림장 내용이 클립보드에 복사되었습니다!');
         });
+
+        // 알림장 이력 확인 버튼 이벤트
+        if (viewNoticeHistoryBtn) {
+            viewNoticeHistoryBtn.addEventListener('click', () => {
+                openModal(noticeHistoryModal);
+                // 날짜 선택기 기본값 오늘로
+                if (noticeHistoryDatePicker) {
+                    noticeHistoryDatePicker.value = getFormattedDate();
+                    noticeHistoryDatePicker.max = getFormattedDate();
+                    displayNoticeHistory(noticeHistoryDatePicker.value);
+                }
+            });
+        }
+
+        // 알림장 이력 모달 날짜 변경 이벤트
+        if (noticeHistoryDatePicker) {
+            noticeHistoryDatePicker.addEventListener('change', (e) => {
+                displayNoticeHistory(e.target.value);
+            });
+        }
+
+        // 알림장 이력 모달 닫기 버튼 이벤트 (close-button)
+        const closeNoticeHistoryBtn = noticeHistoryModal?.querySelector('.close-button');
+        if (closeNoticeHistoryBtn) {
+            closeNoticeHistoryBtn.addEventListener('click', () => {
+                closeModal(noticeHistoryModal);
+            });
+        }
+
+        // 알림장 이력 렌더링 함수
+        function displayNoticeHistory(dateStr) {
+            if (!noticeHistoryContent) return;
+            noticeHistoryContent.innerHTML = '';
+            const entry = appData.assignmentHistory[dateStr];
+            if (!entry || !entry.noticeContent) {
+                noticeHistoryContent.innerHTML = `<p class="text-gray-600">선택한 날짜(${dateStr})의 알림장 내용이 없습니다.</p>`;
+                return;
+            }
+            // 내용 표시
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'p-4 bg-white rounded shadow text-gray-800';
+            contentDiv.textContent = entry.noticeContent;
+            noticeHistoryContent.appendChild(contentDiv);
+        }
 
         // --- Memo Functions ---
         addMemoBtn.addEventListener('click', async () => {
